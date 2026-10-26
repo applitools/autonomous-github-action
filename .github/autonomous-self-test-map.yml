@@ -1,0 +1,4 @@
+# Used by the CI self-test: changes to the action's code run the plan.
+- name: Action source
+  paths: ["src/**", "action.yml"]
+  plans: [fae49398-0644-4ce4-abae-a29d2f384a0c]

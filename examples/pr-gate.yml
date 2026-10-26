@@ -1,0 +1,40 @@
+# Run Autonomous tests for every pull request and push to main, and fail the
+# check when tests fail. Make "Autonomous tests / autonomous" a required status
+# check in branch protection to block merging.
+#
+# Setup: add an Autonomous API key (execute + read permissions) as the
+# repository secret APPLITOOLS_AUTONOMOUS_API_KEY, and copy
+# autonomous-map.yml to .github/autonomous-map.yml.
+
+name: Autonomous tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read          # read the test map and changed files
+  pull-requests: write    # post the results comment
+
+concurrency:
+  # A newer commit supersedes the older run. Note: cancelling the job stops
+  # waiting, but the Autonomous run itself keeps going.
+  group: autonomous-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  autonomous:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60   # backstop above the action's own timeout-minutes
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: applitools/autonomous-github-action@v1
+        with:
+          api-key: ${{ secrets.APPLITOOLS_AUTONOMOUS_API_KEY }}
+          test-map: .github/autonomous-map.yml
+          url: https://qa.example.com
+          fail-on: failed,aborted     # unresolved -> warning only
+          timeout-minutes: 45
+          pr-comment: true

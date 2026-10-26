@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        node: [20, 22, 24]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm test
+
+  # Runs this checkout of the action against the live Autonomous API.
+  # Needs the APPLITOOLS_AUTONOMOUS_API_KEY secret and the AUTONOMOUS_TEST_ID
+  # repository variable (the plan is in .github/autonomous-self-test-map.yml);
+  # skipped when they are missing
+  # (e.g. pull requests from forks).
+  self-test:
+    needs: test
+    if: vars.AUTONOMOUS_TEST_ID != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - id: autonomous
+        uses: ./
+        with:
+          api-key: ${{ secrets.APPLITOOLS_AUTONOMOUS_API_KEY }}
+          test-map: .github/autonomous-self-test-map.yml
+          on-no-match: all
+          test-ids: ${{ vars.AUTONOMOUS_TEST_ID }}
+          fail-on: failed,aborted
+          timeout-minutes: 20
+          poll-interval-seconds: 15
+          pr-comment: true
+          comment-key: self-test
+
+      - name: Check outputs
+        if: always()
+        env:
+          STATUS: ${{ steps.autonomous.outputs.status }}
+          RUN_IDS: ${{ steps.autonomous.outputs.run-ids }}
+          RESULTS_URL: ${{ steps.autonomous.outputs.results-url }}
+        run: |
+          echo "status=$STATUS run-ids=$RUN_IDS"
+          test -n "$STATUS" && test -n "$RUN_IDS" && test -n "$RESULTS_URL"

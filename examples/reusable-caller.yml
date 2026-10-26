@@ -1,0 +1,22 @@
+# Call the shared workflow instead of writing the steps yourself. Teams only
+# choose what to run; checkout, timeouts and permissions are handled for them.
+
+name: Autonomous tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  autonomous:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: applitools/autonomous-github-action/.github/workflows/autonomous.yml@v1
+    with:
+      test-map: .github/autonomous-map.yml
+      url: https://qa.example.com
+      pr-comment: true
+    secrets:
+      api-key: ${{ secrets.APPLITOOLS_AUTONOMOUS_API_KEY }}

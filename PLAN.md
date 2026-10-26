@@ -108,12 +108,14 @@ At least one of `plan-id`, `test-ids`, `test-map` is required. Several can be co
 - PR comment (`pr-comment: true`): one comment per job, found by a hidden `<!-- applitools-autonomous-report:<comment-key> -->` marker and edited in place on re-runs. Needs `permissions: pull-requests: write`. Comment errors (e.g. forked PRs with read-only tokens) only warn; they never change the build result.
 - Skipped and config-error cases also write a summary/comment, so a PR shows why nothing ran.
 
-### Packaging (req. 6)
+### Packaging (req. 6) — built in Phase 4
 
-- `action.yml` at repo root, versioned with tags (`v1`, `v1.0.0`).
-- `examples/` with ready-to-copy workflows: PR gate, push to main, nightly full plan, env matrix (dev/qa/prod URLs).
-- Optional reusable workflow (`.github/workflows/autonomous.yml` with `workflow_call`) for teams who'd rather call a workflow than wire steps.
-- README with setup: create API key with execute+read, add to Secrets, find plan/test IDs, branch protection.
+- `action.yml` at repo root (node24 runtime, no build step). Version with tags `v1.0.0` + moving `v1` (README → Releasing).
+- `examples/`: `pr-gate.yml`, `env-matrix.yml`, `nightly.yml`, `reusable-caller.yml`, `autonomous-map.yml`.
+- Reusable workflow `.github/workflows/autonomous.yml` (`workflow_call`): same inputs plus `runs-on`, `job-timeout-minutes`; checks out only when `test-map` is set; outputs `status`, `run-ids`, `results-url`.
+- `.github/workflows/ci.yml`: `npm test` on Node 20/22/24, plus a `self-test` job running `uses: ./` against the live API (needs secret `APPLITOOLS_AUTONOMOUS_API_KEY` and variable `AUTONOMOUS_TEST_ID`; skipped for fork PRs) that also exercises the real PR comment.
+- README: quick start, test map, gating, environments, reliability, reporting, inputs/outputs, permissions, reusable workflow, limitations, development.
+- Placeholder action path `applitools/autonomous-github-action` in examples/README/reusable workflow; replace once the remote's name is final.
 
 ## Repo layout
 
@@ -169,3 +171,5 @@ Scenarios scripted per run ID:
 3. Reporting: outputs, summary, PR comment.
 4. Packaging: README, examples, reusable workflow, tags.
 5. Live smoke + GitHub E2E, then pilot with a customer team.
+
+Status (2026-10-26): phases 0-4 done locally; live smoke done. Remaining: push to a remote, run CI + self-test (real PR comment, branch protection), tag v1, pilot.

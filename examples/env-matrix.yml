@@ -1,0 +1,33 @@
+# Run the same plan against several environments in parallel. Each
+# environment gets its own check and its own PR comment (comment-key).
+
+name: Autonomous tests (environments)
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  autonomous:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - env: dev
+            url: https://dev.example.com
+          - env: qa
+            url: https://qa.example.com
+    name: autonomous (${{ matrix.env }})
+    steps:
+      - uses: applitools/autonomous-github-action@v1
+        with:
+          api-key: ${{ secrets.APPLITOOLS_AUTONOMOUS_API_KEY }}
+          plan-id: ${{ vars.AUTONOMOUS_PLAN_ID }}
+          url: ${{ matrix.url }}
+          pr-comment: true
+          comment-key: ${{ matrix.env }}

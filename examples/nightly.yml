@@ -1,0 +1,34 @@
+# Full regression every night, strict gating: unresolved results also fail.
+# Can also be started by hand from the Actions tab.
+
+name: Autonomous nightly
+
+on:
+  schedule:
+    - cron: "0 6 * * 1-5"   # 06:00 UTC, Monday-Friday
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Environment URL
+        default: https://qa.example.com
+
+permissions:
+  contents: read
+
+jobs:
+  autonomous:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: applitools/autonomous-github-action@v1
+        id: autonomous
+        with:
+          api-key: ${{ secrets.APPLITOOLS_AUTONOMOUS_API_KEY }}
+          plan-id: ${{ vars.AUTONOMOUS_FULL_PLAN_ID }}
+          url: ${{ inputs.url || 'https://qa.example.com' }}
+          fail-on: failed,unresolved,aborted
+          timeout-minutes: 75
+
+      # Outputs are available to later steps even when the gate fails.
+      - if: always()
+        run: echo "Autonomous finished with ${{ steps.autonomous.outputs.status }} - ${{ steps.autonomous.outputs.results-url }}"

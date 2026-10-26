@@ -1,0 +1,115 @@
+# Reusable workflow: run Applitools Autonomous tests and gate the build.
+#
+#   jobs:
+#     autonomous:
+#       permissions: { contents: read, pull-requests: write }
+#       uses: applitools/autonomous-github-action/.github/workflows/autonomous.yml@v1
+#       with:
+#         test-map: .github/autonomous-map.yml
+#       secrets:
+#         api-key: ${{ secrets.APPLITOOLS_AUTONOMOUS_API_KEY }}
+#
+# Inputs mirror the action's (see action.yml / README); booleans are real booleans here.
+
+name: Applitools Autonomous
+
+on:
+  workflow_call:
+    inputs:
+      plan-id:
+        type: string
+        default: ""
+      test-ids:
+        type: string
+        default: ""
+      test-map:
+        type: string
+        default: ""
+      changed-files:
+        type: string
+        default: ""
+      on-no-match:
+        type: string
+        default: skip
+      url:
+        type: string
+        default: ""
+      parameters:
+        type: string
+        default: ""
+      fail-on:
+        type: string
+        default: failed,aborted
+      timeout-minutes:
+        type: number
+        default: 45
+      poll-interval-seconds:
+        type: number
+        default: 30
+      max-retries:
+        type: number
+        default: 5
+      summary:
+        type: boolean
+        default: true
+      pr-comment:
+        type: boolean
+        default: false
+      comment-key:
+        type: string
+        default: ""
+      server-url:
+        type: string
+        default: https://autonomous.applitools.com
+      runs-on:
+        description: Runner label, for teams using self-hosted runners.
+        type: string
+        default: ubuntu-latest
+      job-timeout-minutes:
+        description: Hard limit for the whole job; keep it above timeout-minutes.
+        type: number
+        default: 60
+    secrets:
+      api-key:
+        required: true
+    outputs:
+      status:
+        value: ${{ jobs.autonomous.outputs.status }}
+      run-ids:
+        value: ${{ jobs.autonomous.outputs.run-ids }}
+      results-url:
+        value: ${{ jobs.autonomous.outputs.results-url }}
+
+jobs:
+  autonomous:
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.job-timeout-minutes }}
+    outputs:
+      status: ${{ steps.autonomous.outputs.status }}
+      run-ids: ${{ steps.autonomous.outputs.run-ids }}
+      results-url: ${{ steps.autonomous.outputs.results-url }}
+    steps:
+      - if: inputs.test-map != ''
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - id: autonomous
+        uses: applitools/autonomous-github-action@v1
+        with:
+          api-key: ${{ secrets.api-key }}
+          server-url: ${{ inputs.server-url }}
+          plan-id: ${{ inputs.plan-id }}
+          test-ids: ${{ inputs.test-ids }}
+          test-map: ${{ inputs.test-map }}
+          changed-files: ${{ inputs.changed-files }}
+          on-no-match: ${{ inputs.on-no-match }}
+          url: ${{ inputs.url }}
+          parameters: ${{ inputs.parameters }}
+          fail-on: ${{ inputs.fail-on }}
+          timeout-minutes: ${{ inputs.timeout-minutes }}
+          poll-interval-seconds: ${{ inputs.poll-interval-seconds }}
+          max-retries: ${{ inputs.max-retries }}
+          summary: ${{ inputs.summary }}
+          pr-comment: ${{ inputs.pr-comment }}
+          comment-key: ${{ inputs.comment-key }}
