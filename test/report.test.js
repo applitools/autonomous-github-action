@@ -107,6 +107,14 @@ test('updates the existing comment for the same key, across pages', async () => 
   assert.deepEqual(gh.calls.at(-1), { method: 'PATCH', path: '/repos/acme/web/issues/comments/777', body: { body: '<!-- applitools-autonomous-report:qa -->\nnew' } });
 });
 
+test('shows the PR head commit, not the merge commit', () => {
+  const e = prEnv();
+  writeFileSync(e.GITHUB_EVENT_PATH, JSON.stringify({ pull_request: { number: 9, head: { sha: '2b523ef0000' } } }));
+  const md = renderReport([], { status: 'skipped' }, { env: { ...e, GITHUB_SHA: 'b366fb20000' } });
+  assert.ok(md.includes('commit `2b523ef`'), md);
+  assert.ok(renderReport([], { status: 'skipped' }, { env: { GITHUB_SHA: 'b366fb20000' } }).includes('commit `b366fb2`'));
+});
+
 test('does nothing outside pull requests', async () => {
   const gh = fakeGitHub();
   assert.equal(await upsertPrComment('x', { ...prEnv(), GITHUB_EVENT_NAME: 'push' }, { token: 't', key: 'k', fetchImpl: gh.fetchImpl }), undefined);

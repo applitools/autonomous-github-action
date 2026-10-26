@@ -35,7 +35,8 @@ export function renderReport(runs, verdict, { failOn = [], parameters, notes = [
   else facts.push(verdict.success ? '**Build passes**' : '**Build fails**');
   facts.push(`fail-on: ${failOn.length ? failOn.join(', ') : 'none'}`);
   for (const [k, v] of Object.entries(parameters ?? {})) facts.push(`${k}: ${code(v)}`);
-  if (env.GITHUB_SHA) facts.push(`commit ${code(env.GITHUB_SHA.slice(0, 7))}`);
+  const sha = commitSha(env);
+  if (sha) facts.push(`commit ${code(sha.slice(0, 7))}`);
   const runUrl = workflowRunUrl(env);
   if (runUrl) facts.push(`[workflow run](${runUrl})`);
   lines.push(facts.join(' · '), '');
@@ -114,9 +115,18 @@ export async function upsertPrComment(markdown, env, { token, key, fetchImpl = f
 }
 
 function pullRequestNumber(env) {
+  return pullRequest(env)?.number;
+}
+
+// On pull requests GITHUB_SHA is a temporary merge commit; show the PR's head instead.
+function commitSha(env) {
+  return pullRequest(env)?.head?.sha ?? env.GITHUB_SHA;
+}
+
+function pullRequest(env) {
   if (!['pull_request', 'pull_request_target'].includes(env.GITHUB_EVENT_NAME) || !env.GITHUB_EVENT_PATH) return undefined;
   try {
-    return JSON.parse(readFileSync(env.GITHUB_EVENT_PATH, 'utf8')).pull_request?.number;
+    return JSON.parse(readFileSync(env.GITHUB_EVENT_PATH, 'utf8')).pull_request;
   } catch {
     return undefined;
   }
