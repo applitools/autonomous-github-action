@@ -22,15 +22,23 @@ Base URL: `https://autonomous.applitools.com`. Auth is a query-string API key; t
 - Unknown route → `404` whose `message` **echoes the full URL, including `apiKey`**. The client redacts the key from all error text.
 - No list endpoints (`/api/plans`, `/api/tests`, …) exist.
 
-### Gaps to verify against a live account (Phase 0)
+### Live runs (2026-10-26, plan `fae49398…`, test `ff3321f2…`)
 
-1. **In-progress status values.** Docs show only `failed` as an example. We need to know what `status` is while a run is queued/running (e.g. `running`, `pending`, `in_progress`) so we know when to stop polling.
-2. **Results link.** No documented UI URL pattern. We need one for "link to the Autonomous results" (req. 3, 8).
-3. **Test execute + parameters.** Does `/api/test/{id}/execute` accept `parameter_values` (needed for env/URL on targeted runs, req. 7)?
-4. **Cancel.** No cancel endpoint documented. If a run hangs we can stop *waiting*, but can't stop the run.
-5. **Rate limits / error shapes** for 401, 403, 404, 429, 5xx.
+- **Status lifecycle:** `pending` → `running` → terminal. Observed terminal: `unresolved`. `passed`/`failed`/`aborted` are assumed from the docs and count fields but not yet seen live.
+- **Counts:** `results` is `{}` while `pending`; from `running` on it has `total`, `passed`, `failed`, `unresolved`, `aborted`, `pending`, plus `modified`, `steps_added`, `steps_removed`, `steps_existing`, `unvalidated`, `required_attention`, `validation_region_added`, `accessibility_{passed,failed,unresolved,pending,reports}`.
+- **Counts are per test × environment** (a test on 2 browsers gives `total: 2`). Action outputs follow the same unit.
+- **Results links (closes gap 2):** run-level `planResultsUrl` and per-test `testResultsUrl` are in every result response, including while pending.
+- **Other fields:** `started_at`, `duration` (ms), per-test `totals` (`steps`, `nlp`, `checkpoints`), `issues[]` with `code` (e.g. `VISUAL_DIFFERENCE`), `message`, `params.url`.
+- **Single test + parameters (gap 3, partly):** `POST /api/test/{id}/execute` accepts `{"parameter_values": {...}}` (HTTP 200). Whether a parameter is *applied* still needs a test that references one.
+- **Run time:** these small runs took 60–90 s; status changes were visible within 15 s.
 
-Anything we can't confirm becomes a documented limitation or a product ask.
+### Still open
+
+1. Confirm a parameterised test/plan actually uses `parameter_values.url` (needs a test built with a URL parameter).
+2. See a real `failed` and `aborted` run to confirm those status strings.
+3. Cancel: no endpoint documented; on timeout we stop waiting but the run continues.
+4. Rate limits: not documented; 429 handling is in place regardless.
+5. Possible extra gate: `accessibility_failed` / `accessibility_unresolved` counts could become `fail-on` options.
 
 ## Design
 

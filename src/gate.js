@@ -48,7 +48,8 @@ export function evaluate(runs, failOn) {
 }
 
 function describe(run, category) {
-  if (category === 'error' || category === 'timed-out') return `${run.label}: ${run.error ?? category}`;
+  const link = run.resultsUrl ? ` - ${run.resultsUrl}` : '';
+  if (category === 'error' || category === 'timed-out') return `${run.label}: ${run.error ?? category}${link}`;
   const count = run.result?.results?.[category];
-  return `${run.label}: ${count ? `${count} ${category}` : category}`;
+  return `${run.label}: ${count ? `${count} ${category}` : category}${link}`;
 }

@@ -31,6 +31,7 @@ test('classifyStatus', () => {
   assert.deepEqual(classifyStatus('Passed'), { done: true, outcome: 'passed' });
   assert.deepEqual(classifyStatus('cancelled'), { done: true, outcome: 'aborted' });
   assert.deepEqual(classifyStatus('running'), { done: false, known: true });
+  assert.deepEqual(classifyStatus('pending'), { done: false, known: true });
   assert.deepEqual(classifyStatus('weird'), { done: false, known: false });
 });
 
@@ -48,6 +49,16 @@ test('polls until every run finishes', async () => {
   assert.equal(client.calls.b.length, 2); // stops polling b once it is done
   assert.equal(client.calls.a[0], 'ta');
   assert.equal(c.now(), 2_000);
+});
+
+test('records and logs the results link once', async () => {
+  const c = clock();
+  const logs = [];
+  const withUrl = (status) => ({ status, results: {}, planResultsUrl: 'https://x/results/a' });
+  const client = fakeClient({ a: [withUrl('pending'), withUrl('pending'), withUrl('passed')] });
+  const [run] = await waitForRuns(client, [{ id: 'a', label: 'A' }], { timeoutMs: 60_000, pollIntervalMs: 1, log: (m) => logs.push(m), ...c });
+  assert.equal(run.resultsUrl, 'https://x/results/a');
+  assert.equal(logs.filter((m) => m.includes('results at https://x/results/a')).length, 1);
 });
 
 test('marks runs still going at the deadline as timed-out', async () => {

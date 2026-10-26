@@ -10,7 +10,8 @@ const TERMINAL = {
   error: 'error',
 };
 
-// Statuses seen (or expected) while a run is still in progress.
+// Statuses seen (or expected) while a run is still in progress. The live API
+// reports "pending" (with empty counts) until the run finishes.
 const IN_PROGRESS = new Set(['running', 'pending', 'queued', 'in_progress', 'started', 'executing', 'new', 'scheduled']);
 
 export function classifyStatus(status) {
@@ -33,7 +34,7 @@ export async function waitForRuns(client, runs, {
   log = () => {},
 }) {
   const deadline = now() + timeoutMs;
-  const state = runs.map((run) => ({ ...run, outcome: undefined, result: undefined, error: undefined, errors: 0, lastStatus: undefined }));
+  const state = runs.map((run) => ({ ...run, outcome: undefined, result: undefined, error: undefined, resultsUrl: undefined, errors: 0, lastStatus: undefined }));
   const warnedStatuses = new Set();
 
   while (true) {
@@ -45,6 +46,10 @@ export async function waitForRuns(client, runs, {
         const result = await client.getResult(s.id, s.readToken);
         s.errors = 0;
         s.result = result;
+        if (result.planResultsUrl && !s.resultsUrl) {
+          s.resultsUrl = result.planResultsUrl;
+          log(`${s.label} (${s.id}): results at ${s.resultsUrl}`);
+        }
         const { done, outcome, known } = classifyStatus(result.status);
         if (result.status !== s.lastStatus) {
           log(`${s.label} (${s.id}): ${result.status}${formatCounts(result.results)}`);

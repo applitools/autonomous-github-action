@@ -102,6 +102,7 @@ export async function run(env = process.env, { clientOptions = {} } = {}) {
 function writeOutputs(runs, verdict, env) {
   gh.setOutput('status', verdict.status, env);
   gh.setOutput('run-ids', runs.map((r) => r.id).filter(Boolean).join(','), env);
+  gh.setOutput('results-url', runs.map((r) => r.resultsUrl).filter(Boolean).join(','), env);
   for (const k of ['passed', 'failed', 'unresolved', 'aborted']) {
     gh.setOutput(k, runs.reduce((sum, r) => sum + (r.result?.results?.[k] ?? 0), 0), env);
   }

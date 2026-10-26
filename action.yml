@@ -38,6 +38,8 @@ outputs:
     description: Overall outcome. One of passed, unresolved, failed, aborted, timed-out, error.
   run-ids:
     description: Comma-separated Autonomous run IDs.
+  results-url:
+    description: Comma-separated links to each run's results in Autonomous.
   passed:
     description: Number of passed tests across all runs.
   failed:

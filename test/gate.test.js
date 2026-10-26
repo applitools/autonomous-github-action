@@ -55,6 +55,11 @@ test('timeouts and errors always fail, even with fail-on none', () => {
   assert.equal(evaluate([run('error', {}, { error: 'boom' })], []).success, false);
 });
 
+test('messages include the results link when known', () => {
+  const v = evaluate([run('failed', { failed: 2 }, { resultsUrl: 'https://x/results/1' })], ['failed']);
+  assert.deepEqual(v.failures, ['run failed: 2 failed - https://x/results/1']);
+});
+
 test('overall status is the worst outcome', () => {
   const v = evaluate([run('passed', { passed: 1 }), run('unresolved', { unresolved: 1 }), run('failed', { failed: 1 })], ['failed']);
   assert.equal(v.status, 'failed');

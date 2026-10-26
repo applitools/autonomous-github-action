@@ -9,8 +9,9 @@ import http from 'node:http';
 
 export const API_KEY = 'test-key-123';
 
+// Matches the live API: status "pending" and empty counts until the run finishes.
 export function running(results = {}) {
-  return { body: { result: { status: 'running', results: { passed: 0, failed: 0, unresolved: 0, aborted: 0, pending: 1, ...results } } } };
+  return { body: { result: { status: 'pending', results, tests: [] } } };
 }
 
 export function finished(status, results = {}) {
@@ -56,7 +57,10 @@ export async function startMockServer(scenarios = {}) {
       const run = runs.get(decodeURIComponent(match[1]));
       if (!run) return send(res, { status: 404, body: { message: `plan execution ${match[1]} not found`, statusCode: 404 } });
       const response = pick(run.scenario.poll ?? [finished('passed', { passed: 1 })], run.polls++);
-      if (response.body?.result) response.body.result.id = match[1];
+      if (response.body?.result) {
+        response.body.result.id = match[1];
+        response.body.result.planResultsUrl ??= `https://autonomous.example/results/${match[1]}/tests`;
+      }
       return send(res, response);
     }
 

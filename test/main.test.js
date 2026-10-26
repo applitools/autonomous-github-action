@@ -52,6 +52,8 @@ test('plan that passes -> exit 0 and outputs', async () => {
   assert.equal(out.status, 'passed');
   assert.match(out['run-ids'], /^run-plan-pass-\d+$/);
   assert.equal(out.passed, '3');
+  assert.equal(out['results-url'], `https://autonomous.example/results/${out['run-ids']}/tests`);
+  assert.ok(logs.some((l) => l.includes(`results at https://autonomous.example/results/${out['run-ids']}/tests`)));
   assert.equal(out.failed, '0');
   const exec = server.requests.find((r) => r.path === '/api/plan/plan-pass/execute');
   assert.deepEqual(exec.body, { parameter_values: { url: 'https://qa.example.com' } });
@@ -67,7 +69,7 @@ test('targeted tests with one failure -> exit 1, combined counts', async () => {
   assert.equal(out['run-ids'].split(',').length, 2);
   assert.equal(out.passed, '1');
   assert.equal(out.failed, '1');
-  assert.ok(logs.some((l) => l.startsWith('::error::test test-fail: 1 failed')));
+  assert.ok(logs.some((l) => /^::error::test test-fail: 1 failed - https:\/\/autonomous\.example\/results\/run-test-fail-\d+\/tests$/.test(l)));
 });
 
 test('plan and tests together', async () => {
