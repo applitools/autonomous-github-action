@@ -90,7 +90,7 @@ jobs:
       results-url: ${{ steps.autonomous.outputs.results-url }}
     steps:
       - if: inputs.test-map != ''
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
