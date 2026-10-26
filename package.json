@@ -1,0 +1,14 @@
+{
+  "name": "applitools-autonomous-github-action",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Run Applitools Autonomous tests from GitHub Actions and gate the build on the result",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "license": "MIT"
+}

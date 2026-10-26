@@ -1,0 +1,52 @@
+name: Applitools Autonomous
+description: Run Applitools Autonomous plans or tests, wait for the result, and pass or fail the build.
+author: Applitools
+branding:
+  icon: eye
+  color: purple
+
+inputs:
+  api-key:
+    description: Autonomous API key with execute permission (and read permission, unless the run's read token is used). Store it in GitHub Secrets.
+    required: true
+  server-url:
+    description: Autonomous server URL.
+    default: https://autonomous.applitools.com
+  plan-id:
+    description: ID of a plan to run.
+  test-ids:
+    description: Comma- or newline-separated test IDs to run individually.
+  url:
+    description: Target URL to test against. Shortcut for parameters {"url":"..."}.
+  parameters:
+    description: JSON object of plan parameter values, sent as parameter_values.
+  fail-on:
+    description: Comma-separated outcomes that fail the build. Any of failed, unresolved, aborted. Other non-passing outcomes produce a warning. Timeouts and API errors always fail.
+    default: failed,aborted
+  timeout-minutes:
+    description: Maximum minutes to wait for all runs to finish.
+    default: "45"
+  poll-interval-seconds:
+    description: Seconds between result checks.
+    default: "30"
+  max-retries:
+    description: Retries per API request on network errors, rate limiting and server errors.
+    default: "5"
+
+outputs:
+  status:
+    description: Overall outcome. One of passed, unresolved, failed, aborted, timed-out, error.
+  run-ids:
+    description: Comma-separated Autonomous run IDs.
+  passed:
+    description: Number of passed tests across all runs.
+  failed:
+    description: Number of failed tests across all runs.
+  unresolved:
+    description: Number of unresolved tests across all runs.
+  aborted:
+    description: Number of aborted tests across all runs.
+
+runs:
+  using: node24
+  main: src/main.js
