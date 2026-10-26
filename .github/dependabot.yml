@@ -1,0 +1,19 @@
+# Weekly update checks. The action has no npm dependencies today; the npm
+# entry covers any that are added later.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      # The reusable workflow references this action's own major tag on purpose.
+      - dependency-name: applitools/autonomous-github-action
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
