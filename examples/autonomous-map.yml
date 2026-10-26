@@ -1,0 +1,21 @@
+# Which Autonomous tests to run for which changed files.
+# Copy to your repo (e.g. .github/autonomous-map.yml) and set `test-map` to its path.
+#
+# Pattern rules (like .gitignore / CODEOWNERS):
+#   **  any directories   *  anything but "/"   {a,b}  either   !pattern  exclude
+#   A pattern without "/" matches at any depth ("*.md"); a leading "/" anchors to the root.
+# Every entry that matches at least one changed file runs; results are combined.
+
+- name: Checkout
+  paths: ["src/checkout/**", "src/payments/**", "!**/*.md"]
+  tests:
+    - 00000000-0000-0000-0000-000000000001   # Add to cart
+    - 00000000-0000-0000-0000-000000000002   # Pay by card
+
+- name: Search
+  paths: ["src/search/**"]
+  tests: [00000000-0000-0000-0000-000000000003]
+
+- name: Shared code - run the smoke plan
+  paths: ["src/shared/**", "package.json", "package-lock.json"]
+  plans: [00000000-0000-0000-0000-0000000000aa]

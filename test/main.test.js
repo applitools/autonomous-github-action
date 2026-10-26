@@ -126,7 +126,7 @@ test('bad API key fails fast with a clear message', async () => {
 test('config validation', () => {
   const base = { 'INPUT_API-KEY': 'k' };
   assert.throws(() => readConfig({}), /api-key is required/);
-  assert.throws(() => readConfig(base), /Set plan-id and\/or test-ids/);
+  assert.throws(() => readConfig(base), /Set at least one of plan-id, test-ids or test-map/);
   assert.throws(() => readConfig({ ...base, 'INPUT_PLAN-ID': 'p', INPUT_PARAMETERS: '{bad' }), /not valid JSON/);
   assert.throws(() => readConfig({ ...base, 'INPUT_PLAN-ID': 'p', INPUT_PARAMETERS: '[1]' }), /must be a JSON object/);
   assert.throws(() => readConfig({ ...base, 'INPUT_PLAN-ID': 'p', 'INPUT_TIMEOUT-MINUTES': '0' }), /timeout-minutes must be a positive number/);
@@ -145,5 +145,97 @@ test('invalid config exits 1 without calling the API', async () => {
   const before = server.requests.length;
   assert.equal(await run({ 'INPUT_API-KEY': 'k' }), 1);
   assert.equal(server.requests.length, before);
-  assert.ok(logs.some((l) => l.startsWith('::error::Set plan-id')));
+  assert.ok(logs.some((l) => l.startsWith('::error::Set at least one of plan-id')));
+});
+
+// --- test-map -------------------------------------------------------------
+
+const MAP = `
+- name: Checkout
+  paths: ["src/checkout/**"]
+  tests: [test-pass]
+- name: Search
+  paths: ["src/search/**"]
+  tests: [test-fail]
+  plans: [plan-pass]
+`;
+
+function mapEnv(inputs, map = MAP) {
+  const workspace = mkdtempSync(join(tmpdir(), 'workspace-'));
+  writeFileSync(join(workspace, 'autonomous-map.yml'), map);
+  return { ...env({ 'test-map': 'autonomous-map.yml', ...inputs }), GITHUB_WORKSPACE: workspace };
+}
+
+const executed = (since) => server.requests.slice(since).filter((r) => r.path.endsWith('/execute')).map((r) => r.path);
+
+test('test-map runs only the entries matching changed files', async () => {
+  const since = server.requests.length;
+  const code = await run(mapEnv({ 'changed-files': 'src/checkout/cart.ts\nREADME.md' }), fast);
+  assert.equal(code, 0);
+  assert.deepEqual(executed(since), ['/api/test/test-pass/execute']);
+  assert.ok(logs.some((l) => l === 'Test map "Checkout" matched 1 file(s): src/checkout/cart.ts'));
+});
+
+test('test-map unions matches with plan-id and de-duplicates', async () => {
+  const since = server.requests.length;
+  const code = await run(mapEnv({ 'plan-id': 'plan-pass', 'changed-files': 'src/search/a.ts,src/checkout/b.ts' }), fast);
+  assert.equal(code, 1); // test-fail is in the Search entry
+  assert.deepEqual(executed(since).sort(), ['/api/plan/plan-pass/execute', '/api/test/test-fail/execute', '/api/test/test-pass/execute']);
+});
+
+test('no match with on-no-match skip passes without calling Autonomous', async () => {
+  const since = server.requests.length;
+  const code = await run(mapEnv({ 'changed-files': 'docs/readme.md' }), fast);
+  assert.equal(code, 0);
+  assert.equal(server.requests.length, since);
+  assert.equal(outputs().status, 'skipped');
+  assert.ok(logs.some((l) => l.startsWith('::notice::No Autonomous tests matched')));
+});
+
+test('no match still runs plan-id', async () => {
+  const since = server.requests.length;
+  assert.equal(await run(mapEnv({ 'plan-id': 'plan-pass', 'changed-files': 'docs/readme.md' }), fast), 0);
+  assert.deepEqual(executed(since), ['/api/plan/plan-pass/execute']);
+});
+
+test('no match with on-no-match all runs the whole map', async () => {
+  const since = server.requests.length;
+  await run(mapEnv({ 'changed-files': 'docs/readme.md', 'on-no-match': 'all' }), fast);
+  assert.equal(executed(since).length, 3);
+});
+
+test('no match with on-no-match fail fails', async () => {
+  const since = server.requests.length;
+  assert.equal(await run(mapEnv({ 'changed-files': 'docs/readme.md', 'on-no-match': 'fail' }), fast), 1);
+  assert.equal(server.requests.length, since);
+  assert.ok(logs.some((l) => l.startsWith('::error::No entry in autonomous-map.yml matched the 1 changed file(s)')));
+});
+
+test('unknown changed files run the whole map with a warning', async () => {
+  const since = server.requests.length;
+  const changes = async () => ({ files: undefined, reason: 'push created a new branch' });
+  await run(mapEnv({}), { ...fast, targetOptions: { changes } });
+  assert.equal(executed(since).length, 3);
+  assert.ok(logs.some((l) => l.startsWith('::warning::Could not determine changed files (push created a new branch)')));
+});
+
+test('changed files come from the GitHub event when not given', async () => {
+  const since = server.requests.length;
+  let seen;
+  const changes = async (e, opts) => { seen = opts.token; return { files: ['src/checkout/x.ts'] }; };
+  await run({ ...mapEnv({ 'github-token': 'gh-token' }) }, { ...fast, targetOptions: { changes } });
+  assert.equal(seen, 'gh-token');
+  assert.deepEqual(executed(since), ['/api/test/test-pass/execute']);
+});
+
+test('missing or invalid test-map fails clearly', async () => {
+  const missing = { ...env({ 'test-map': 'nope.yml', 'changed-files': 'a' }), GITHUB_WORKSPACE: tmpdir() };
+  assert.equal(await run(missing, fast), 1);
+  assert.ok(logs.some((l) => l.includes('Could not read test-map nope.yml: file not found (did you run actions/checkout?)')));
+  assert.equal(await run(mapEnv({ 'changed-files': 'a' }, '- paths: [a]\n  test: [x]'), fast), 1);
+  assert.ok(logs.some((l) => l.includes('unknown key "test"')));
+});
+
+test('on-no-match is validated', () => {
+  assert.throws(() => readConfig({ 'INPUT_API-KEY': 'k', 'INPUT_TEST-MAP': 'm', 'INPUT_ON-NO-MATCH': 'maybe' }), /on-no-match must be one of skip, all, fail/);
 });

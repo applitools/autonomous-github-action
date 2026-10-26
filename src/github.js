@@ -20,6 +20,10 @@ export function info(message) {
   console.log(message);
 }
 
+export function notice(message) {
+  console.log(`::notice::${escape(message)}`);
+}
+
 export function warning(message) {
   console.log(`::warning::${escape(message)}`);
 }

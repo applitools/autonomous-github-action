@@ -50,31 +50,31 @@ Base URL: `https://autonomous.applitools.com`. Auth is a query-string API key; t
 |---|---|---|
 | `api-key` (from Secrets) | — required | 6 |
 | `server-url` | `https://autonomous.applitools.com` | 6 |
-| `plan-id` | — | 2 |
+| `plan-id` (one or more) | — | 2 |
 | `test-ids` (comma/newline list) | — | 2 |
-| `test-map` (path to YAML: file globs → test/plan IDs) | — | 2 |
+| `test-map` (path to YAML/JSON: file globs → test/plan IDs) | — | 2 |
+| `changed-files` (override; otherwise read from the PR/push via GitHub API) | — | 2 |
+| `on-no-match` (`skip` \| `all` \| `fail`) | `skip` | 2 |
+| `github-token` (read changed files; later PR comment) | `${{ github.token }}` | 2, 8 |
 | `url` (shortcut for `parameter_values.url`) | — | 7 |
 | `parameters` (JSON object → `parameter_values`) | — | 7 |
 | `fail-on` (`failed`, `unresolved`, `aborted`, comma list, or `none`). Outcomes not listed produce a warning; timeouts and API errors always fail | `failed,aborted` | 4 |
 | `timeout-minutes` (overall wait) | `45` | 5 |
 | `poll-interval-seconds` | `30` | 5 |
 | `max-retries` (per API call) | `5` | 5 |
-| `github-token` (only for PR comment) | — | 8 |
 | `pr-comment` (`true`/`false`) | `false` | 8 |
 
 At least one of `plan-id`, `test-ids`, `test-map` is required. Several can be combined; all runs are started in parallel and reported together.
 
-### Targeted execution (req. 2)
+### Targeted execution (req. 2) — built in Phase 2
 
-- `test-ids`: run exactly these tests.
-- `test-map`: a YAML file checked into the repo, e.g.
-  ```yaml
-  - paths: ["src/checkout/**"]
-    tests: ["<test-id-1>", "<test-id-2>"]
-  - paths: ["src/**"]
-    plans: ["<smoke-plan-id>"]
-  ```
-  The action diffs the PR (base…head) or push (before…after), matches changed files, and runs the union. If nothing matches, it either skips with a neutral result or falls back to `plan-id` (configurable).
+- `plan-id` / `test-ids`: always run.
+- `test-map`: a YAML (or JSON) file in the repo; see `examples/autonomous-map.yml`. Each entry has `paths` (globs, `!` to exclude), and `tests` and/or `plans`. Every entry matching a changed file runs; everything is unioned and de-duplicated.
+- The YAML parser is a strict subset (lists of strings, inline or block) so the action stays dependency-free; unknown keys and unsupported syntax fail with a line number.
+- Globs follow `.gitignore`/CODEOWNERS rules (own matcher: Node's `path.matchesGlob` skips dot-dirs like `.github/` and is missing on Node 20).
+- Changed files come from the GitHub API (PR files, or compare `before...after` for push), so checkout depth doesn't matter. Renames count under old and new paths.
+- When changed files can't be known (new branch, >300 files on push / >3000 on PR, other events, API error) the action **runs the whole map** with a warning, so tests are never silently skipped. `changed-files` lets teams supply their own list.
+- When nothing matches: `on-no-match: skip` (default; passes with a notice, status `skipped`), `all`, or `fail`. `plan-id`/`test-ids` still run.
 
 ### Flow
 

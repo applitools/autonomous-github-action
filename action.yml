@@ -13,9 +13,19 @@ inputs:
     description: Autonomous server URL.
     default: https://autonomous.applitools.com
   plan-id:
-    description: ID of a plan to run.
+    description: ID of a plan to run. Several can be given, comma- or newline-separated.
   test-ids:
     description: Comma- or newline-separated test IDs to run individually.
+  test-map:
+    description: Path (relative to the repo root) of a YAML or JSON file mapping file globs to test and plan IDs. Only entries matching the changed files are run, in addition to plan-id and test-ids.
+  changed-files:
+    description: Comma- or newline-separated changed files to match against test-map. By default they are read from the pull request or push via the GitHub API.
+  on-no-match:
+    description: What to do when test-map matches no changed files and nothing else is set to run. skip (pass without running), all (run every test in the map) or fail.
+    default: skip
+  github-token:
+    description: Token used to read changed files for test-map. Needs contents read (push) or pull-requests read (pull_request).
+    default: ${{ github.token }}
   url:
     description: Target URL to test against. Shortcut for parameters {"url":"..."}.
   parameters:
@@ -35,7 +45,7 @@ inputs:
 
 outputs:
   status:
-    description: Overall outcome. One of passed, unresolved, failed, aborted, timed-out, error.
+    description: Overall outcome. One of passed, unresolved, failed, aborted, timed-out, error, skipped.
   run-ids:
     description: Comma-separated Autonomous run IDs.
   results-url:

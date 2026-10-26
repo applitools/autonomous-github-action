@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { AutonomousClient } from './client.js';
 import { waitForRuns } from './poller.js';
 import { evaluate, parseFailOn } from './gate.js';
+import { resolveTargets, NO_MATCH_MODES } from './targets.js';
 import * as gh from './github.js';
 
 export function readConfig(env = process.env) {
@@ -12,9 +13,14 @@ export function readConfig(env = process.env) {
   const apiKey = input('api-key');
   if (!apiKey) throw new Error('api-key is required');
 
-  const planId = input('plan-id');
-  const testIds = [...new Set(input('test-ids').split(/[\s,]+/).filter(Boolean))];
-  if (!planId && testIds.length === 0) throw new Error('Set plan-id and/or test-ids');
+  const planIds = list(input('plan-id'));
+  const testIds = list(input('test-ids'));
+  const testMap = input('test-map');
+  if (!planIds.length && !testIds.length && !testMap) throw new Error('Set at least one of plan-id, test-ids or test-map');
+
+  const changedFilesInput = input('changed-files');
+  const onNoMatch = (input('on-no-match') || 'skip').toLowerCase();
+  if (!NO_MATCH_MODES.includes(onNoMatch)) throw new Error(`on-no-match must be one of ${NO_MATCH_MODES.join(', ')}, got "${onNoMatch}"`);
 
   let parameters;
   const rawParameters = input('parameters');
@@ -34,8 +40,12 @@ export function readConfig(env = process.env) {
   return {
     apiKey,
     serverUrl: input('server-url') || 'https://autonomous.applitools.com',
-    planId,
+    planIds,
     testIds,
+    testMap,
+    changedFiles: changedFilesInput ? list(changedFilesInput) : undefined,
+    onNoMatch,
+    githubToken: input('github-token') || env.GITHUB_TOKEN,
     parameters,
     failOn: parseFailOn(input('fail-on') || 'failed,aborted'),
     timeoutMs: positiveNumber(input('timeout-minutes') || '45', 'timeout-minutes') * 60_000,
@@ -44,7 +54,7 @@ export function readConfig(env = process.env) {
   };
 }
 
-export async function run(env = process.env, { clientOptions = {} } = {}) {
+export async function run(env = process.env, { clientOptions = {}, targetOptions = {} } = {}) {
   let config;
   try {
     config = readConfig(env);
@@ -62,10 +72,21 @@ export async function run(env = process.env, { clientOptions = {} } = {}) {
     ...clientOptions,
   });
 
-  const targets = [
-    ...(config.planId ? [{ kind: 'plan', id: config.planId }] : []),
-    ...config.testIds.map((id) => ({ kind: 'test', id })),
-  ];
+  let targets;
+  try {
+    const resolved = await resolveTargets(config, env, { log: gh.info, warn: gh.warning, ...targetOptions });
+    if (resolved.skipped) {
+      gh.notice('No Autonomous tests matched this change; nothing to run');
+      writeOutputs([], { status: 'skipped' }, env);
+      return 0;
+    }
+    targets = resolved.targets;
+  } catch (err) {
+    gh.error(err.message);
+    writeOutputs([], { status: 'error' }, env);
+    return 1;
+  }
+  gh.info(`Running ${targets.map((t) => `${t.kind} ${t.id}`).join(', ')}`);
 
   const started = await Promise.all(targets.map(async (t) => {
     const label = `${t.kind} ${t.id}`;
@@ -106,6 +127,11 @@ function writeOutputs(runs, verdict, env) {
   for (const k of ['passed', 'failed', 'unresolved', 'aborted']) {
     gh.setOutput(k, runs.reduce((sum, r) => sum + (r.result?.results?.[k] ?? 0), 0), env);
   }
+}
+
+// Comma/whitespace-separated list, de-duplicated.
+function list(value) {
+  return [...new Set(value.split(/[\s,]+/).filter(Boolean))];
 }
 
 function positiveNumber(value, name) {
