@@ -9,6 +9,16 @@ Run [Applitools Autonomous](https://applitools.com/platform/autonomous) tests wh
 - **Handles long runs**: an overall timeout, retries with backoff, and distinct `timed-out` and `error` states, so a stuck run can't hold up the pipeline.
 - **Reusable**: no dependencies; use the action directly or call the shared workflow.
 
+## Support
+
+This action is provided **as is**:
+
+- **No maintenance commitment:** there's no promise of bug fixes or new features.
+- **No support SLA:** questions and issues may not get a response within any set time.
+- **No upgrade guarantee:** future changes to Autonomous, GitHub Actions or Node.js may break it, and it may not be updated to match.
+
+Test it in your own workflows before relying on it, and pin an exact version (for example `@v1.0.0`) so it only changes when you choose.
+
 ## Quick start
 
 1. In Autonomous, create an API key with **execute** and **read** permissions.
