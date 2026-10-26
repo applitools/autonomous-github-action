@@ -5,6 +5,7 @@
 // cannot be determined (callers then run everything in the test map).
 
 import { readFileSync } from 'node:fs';
+import { githubApi } from './github.js';
 
 const PR_FILES_LIMIT = 3000; // GitHub returns at most this many files for a PR
 const COMPARE_FILES_LIMIT = 300; // ...and this many for a compare
@@ -13,7 +14,6 @@ const ZERO_SHA = /^0+$/;
 export async function getChangedFiles(env = process.env, { token, fetchImpl = fetch, log = () => {} } = {}) {
   const eventName = env.GITHUB_EVENT_NAME;
   const repo = env.GITHUB_REPOSITORY;
-  const apiUrl = (env.GITHUB_API_URL || 'https://api.github.com').replace(/\/+$/, '');
   if (!eventName || !repo || !env.GITHUB_EVENT_PATH) return unknown('not running in GitHub Actions');
 
   let event;
@@ -24,14 +24,8 @@ export async function getChangedFiles(env = process.env, { token, fetchImpl = fe
   }
   if (!token) return unknown('no github-token');
 
-  const api = async (path) => {
-    const res = await fetchImpl(`${apiUrl}${path}`, {
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' },
-      signal: AbortSignal.timeout(30_000),
-    });
-    if (!res.ok) throw new Error(`GitHub API ${path} -> HTTP ${res.status}`);
-    return res.json();
-  };
+  const request = githubApi(env, token, fetchImpl);
+  const api = (path) => request('GET', path);
 
   try {
     if (eventName === 'pull_request' || eventName === 'pull_request_target') {

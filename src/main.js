@@ -5,6 +5,7 @@ import { AutonomousClient } from './client.js';
 import { waitForRuns } from './poller.js';
 import { evaluate, parseFailOn } from './gate.js';
 import { resolveTargets, NO_MATCH_MODES } from './targets.js';
+import { renderReport, upsertPrComment } from './report.js';
 import * as gh from './github.js';
 
 export function readConfig(env = process.env) {
@@ -51,10 +52,13 @@ export function readConfig(env = process.env) {
     timeoutMs: positiveNumber(input('timeout-minutes') || '45', 'timeout-minutes') * 60_000,
     pollIntervalMs: positiveNumber(input('poll-interval-seconds') || '30', 'poll-interval-seconds') * 1000,
     maxRetries: nonNegativeInteger(input('max-retries') || '5', 'max-retries'),
+    summary: boolean(input('summary') || 'true', 'summary'),
+    prComment: boolean(input('pr-comment') || 'false', 'pr-comment'),
+    commentKey: input('comment-key') || env.GITHUB_JOB || 'default',
   };
 }
 
-export async function run(env = process.env, { clientOptions = {}, targetOptions = {} } = {}) {
+export async function run(env = process.env, { clientOptions = {}, targetOptions = {}, commentOptions = {} } = {}) {
   let config;
   try {
     config = readConfig(env);
@@ -72,19 +76,25 @@ export async function run(env = process.env, { clientOptions = {}, targetOptions
     ...clientOptions,
   });
 
+  const finish = async (runs, verdict, extra = {}) => {
+    writeOutputs(runs, verdict, env);
+    await report(runs, verdict, { ...extra, config, env, commentOptions });
+    return verdict.status === 'skipped' || verdict.success ? 0 : 1;
+  };
+
   let targets;
+  let notes = [];
   try {
     const resolved = await resolveTargets(config, env, { log: gh.info, warn: gh.warning, ...targetOptions });
+    notes = resolved.notes;
     if (resolved.skipped) {
       gh.notice('No Autonomous tests matched this change; nothing to run');
-      writeOutputs([], { status: 'skipped' }, env);
-      return 0;
+      return finish([], { status: 'skipped' }, { notes });
     }
     targets = resolved.targets;
   } catch (err) {
     gh.error(err.message);
-    writeOutputs([], { status: 'error' }, env);
-    return 1;
+    return finish([], { status: 'error', success: false }, { notes, error: err.message });
   }
   gh.info(`Running ${targets.map((t) => `${t.kind} ${t.id}`).join(', ')}`);
 
@@ -112,12 +122,33 @@ export async function run(env = process.env, { clientOptions = {}, targetOptions
   const runs = started.map((r) => r.outcome ? r : finished.find((f) => f.id === r.id));
 
   const verdict = evaluate(runs, config.failOn);
-  writeOutputs(runs, verdict, env);
-
   verdict.warnings.forEach(gh.warning);
   verdict.failures.forEach(gh.error);
   gh.info(`Autonomous result: ${verdict.status} -> build ${verdict.success ? 'passes' : 'fails'}`);
-  return verdict.success ? 0 : 1;
+  return finish(runs, verdict, { notes });
+}
+
+// Job summary and PR comment. Reporting problems never change the build result.
+async function report(runs, verdict, { config, env, notes, error, commentOptions }) {
+  const markdown = renderReport(runs, verdict, { failOn: config.failOn, parameters: config.parameters, notes, error, env });
+  if (config.summary) {
+    try {
+      gh.appendSummary(markdown, env);
+    } catch (err) {
+      gh.warning(`Could not write the job summary: ${err.message}`);
+    }
+  }
+  if (config.prComment) {
+    try {
+      const done = await upsertPrComment(markdown, env, { token: config.githubToken, key: config.commentKey, ...commentOptions });
+      gh.info(done ?? 'Not a pull request; skipping the PR comment');
+    } catch (err) {
+      const hint = err.status === 403 || err.status === 404
+        ? ' (the workflow needs "permissions: pull-requests: write"; pull requests from forks get a read-only token)'
+        : '';
+      gh.warning(`Could not comment on the pull request: ${err.message}${hint}`);
+    }
+  }
 }
 
 function writeOutputs(runs, verdict, env) {
@@ -132,6 +163,13 @@ function writeOutputs(runs, verdict, env) {
 // Comma/whitespace-separated list, de-duplicated.
 function list(value) {
   return [...new Set(value.split(/[\s,]+/).filter(Boolean))];
+}
+
+function boolean(value, name) {
+  const v = value.toLowerCase();
+  if (v === 'true') return true;
+  if (v === 'false') return false;
+  throw new Error(`${name} must be true or false, got "${value}"`);
 }
 
 function positiveNumber(value, name) {

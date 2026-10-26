@@ -62,7 +62,9 @@ Base URL: `https://autonomous.applitools.com`. Auth is a query-string API key; t
 | `timeout-minutes` (overall wait) | `45` | 5 |
 | `poll-interval-seconds` | `30` | 5 |
 | `max-retries` (per API call) | `5` | 5 |
+| `summary` (`true`/`false`) | `true` | 8 |
 | `pr-comment` (`true`/`false`) | `false` | 8 |
+| `comment-key` (separate comments per matrix job) | job ID | 8 |
 
 At least one of `plan-id`, `test-ids`, `test-map` is required. Several can be combined; all runs are started in parallel and reported together.
 
@@ -93,12 +95,18 @@ At least one of `plan-id`, `test-ids`, `test-map` is required. Several can be co
 - Distinct final states: `passed`, `failed`, `unresolved`, `aborted`, `timed-out`, `error`.
 - Also recommend `timeout-minutes` on the job itself as a backstop.
 
-### Outputs and reporting (req. 3, 8)
+### Outputs and reporting (req. 3, 8) — built in Phase 3
 
-- Step outputs: `status`, `run-ids`, `results-url`, `passed`, `failed`, `unresolved`, `aborted`.
+- Step outputs: `status` (`passed`, `unresolved`, `failed`, `aborted`, `timed-out`, `error`, `skipped`), `run-ids`, `results-url`, `passed`, `failed`, `unresolved`, `aborted`.
 - The job is itself a GitHub check, so pass/fail shows on the commit/PR and can be made a required status check for branch protection (that's the gate).
-- Job summary: table of tests with name, status, duration, link; plus any `issues`.
-- Optional PR comment, updated in place on re-runs (found by a hidden marker) rather than piling up.
+- Log annotations: one warning/error per non-passing run, each with its Autonomous link.
+- One markdown report (`src/report.js`) feeds both the job summary and the PR comment:
+  - Headline with status icon; build passes/fails; fail-on; parameters (e.g. `url`); commit; link to the workflow run.
+  - Run table: run name (linked to `planResultsUrl`), status, counts, duration, environments.
+  - Test table (when there's more than one test): name (linked to `testResultsUrl`), run, status, counts. Collapsed above 10 tests, capped at 100 rows.
+  - `issues` (e.g. `VISUAL_DIFFERENCE` on a URL), capped at 20; "Why the build failed" list; test-map notes (what matched / why everything ran).
+- PR comment (`pr-comment: true`): one comment per job, found by a hidden `<!-- applitools-autonomous-report:<comment-key> -->` marker and edited in place on re-runs. Needs `permissions: pull-requests: write`. Comment errors (e.g. forked PRs with read-only tokens) only warn; they never change the build result.
+- Skipped and config-error cases also write a summary/comment, so a PR shows why nothing ran.
 
 ### Packaging (req. 6)
 

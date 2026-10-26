@@ -239,3 +239,82 @@ test('missing or invalid test-map fails clearly', async () => {
 test('on-no-match is validated', () => {
   assert.throws(() => readConfig({ 'INPUT_API-KEY': 'k', 'INPUT_TEST-MAP': 'm', 'INPUT_ON-NO-MATCH': 'maybe' }), /on-no-match must be one of skip, all, fail/);
 });
+
+// --- job summary and PR comment -------------------------------------------
+
+function summaryEnv(inputs, extra = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'summary-'));
+  const summary = join(dir, 'summary.md');
+  writeFileSync(summary, '');
+  const eventPath = join(dir, 'event.json');
+  writeFileSync(eventPath, JSON.stringify({ pull_request: { number: 12 } }));
+  return {
+    summary,
+    env: {
+      ...env(inputs), GITHUB_STEP_SUMMARY: summary, GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: eventPath,
+      GITHUB_REPOSITORY: 'acme/web', GITHUB_API_URL: 'https://gh.example', GITHUB_JOB: 'autonomous', ...extra,
+    },
+  };
+}
+
+function fakeGitHubApi(status = 200) {
+  const comments = [];
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    calls.push(`${init.method} ${url.replace('https://gh.example', '')}`);
+    if (status !== 200) return new Response('', { status });
+    if (init.method === 'GET') return Response.json(comments);
+    const body = JSON.parse(init.body).body;
+    if (init.method === 'POST') comments.push({ id: comments.length + 1, body });
+    else comments.find((c) => url.endsWith(`/comments/${c.id}`)).body = body;
+    return Response.json({});
+  };
+  return { comments, calls, fetchImpl };
+}
+
+test('writes the job summary', async () => {
+  const { env: e, summary } = summaryEnv({ 'test-ids': 'test-pass,test-fail' });
+  assert.equal(await run(e, fast), 1);
+  const md = readFileSync(summary, 'utf8');
+  assert.match(md, /^## ❌ Applitools Autonomous: failed/);
+  assert.match(md, /\| \[test test-fail\]\(https:\/\/autonomous\.example\/results\/run-test-fail-\d+\/tests\) \| ❌ failed \| 1 failed \|/);
+  assert.ok(md.includes('**Why the build failed**'));
+});
+
+test('summary can be turned off', async () => {
+  const { env: e, summary } = summaryEnv({ 'test-ids': 'test-pass', summary: 'false' });
+  await run(e, fast);
+  assert.equal(readFileSync(summary, 'utf8'), '');
+});
+
+test('posts a PR comment, then updates it on the next run', async () => {
+  const gh = fakeGitHubApi();
+  const { env: e } = summaryEnv({ 'test-ids': 'test-pass', 'pr-comment': 'true', 'github-token': 't' });
+  await run(e, { ...fast, commentOptions: { fetchImpl: gh.fetchImpl } });
+  await run(e, { ...fast, commentOptions: { fetchImpl: gh.fetchImpl } });
+  assert.equal(gh.comments.length, 1);
+  assert.match(gh.comments[0].body, /^<!-- applitools-autonomous-report:autonomous -->\n## ✅ Applitools Autonomous: passed/);
+  assert.deepEqual(gh.calls.filter((c) => !c.startsWith('GET')), ['POST /repos/acme/web/issues/12/comments', 'PATCH /repos/acme/web/issues/comments/1']);
+  assert.ok(logs.includes('Updated PR #12 comment'));
+});
+
+test('a PR comment failure warns but does not change the result', async () => {
+  const gh = fakeGitHubApi(403);
+  const { env: e } = summaryEnv({ 'test-ids': 'test-pass', 'pr-comment': 'true', 'github-token': 't' });
+  assert.equal(await run(e, { ...fast, commentOptions: { fetchImpl: gh.fetchImpl } }), 0);
+  assert.ok(logs.some((l) => l.startsWith('::warning::Could not comment on the pull request') && l.includes('pull-requests: write')));
+});
+
+test('skipped runs still report', async () => {
+  const gh = fakeGitHubApi();
+  const { env: e, summary } = summaryEnv({ 'pr-comment': 'true', 'github-token': 't', 'changed-files': 'docs/x.md' });
+  const workspace = mkdtempSync(join(tmpdir(), 'workspace-'));
+  writeFileSync(join(workspace, 'map.yml'), MAP);
+  assert.equal(await run({ ...e, 'INPUT_TEST-MAP': 'map.yml', GITHUB_WORKSPACE: workspace }, { ...fast, commentOptions: { fetchImpl: gh.fetchImpl } }), 0);
+  assert.match(readFileSync(summary, 'utf8'), /Applitools Autonomous: skipped/);
+  assert.match(gh.comments[0].body, /Applitools Autonomous: skipped/);
+});
+
+test('boolean inputs are validated', () => {
+  assert.throws(() => readConfig({ 'INPUT_API-KEY': 'k', 'INPUT_PLAN-ID': 'p', 'INPUT_PR-COMMENT': 'yes' }), /pr-comment must be true or false/);
+});

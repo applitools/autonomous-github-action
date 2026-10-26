@@ -47,9 +47,14 @@ export function evaluate(runs, failOn) {
   return { status, success: failures.length === 0 && runs.length > 0, failures, warnings };
 }
 
+// "plan "Checkout smoke"" once the run's name is known, else "plan <id>".
+export function displayName(run) {
+  return run.name ? `${run.target?.kind ?? 'run'} "${run.name}"` : run.label;
+}
+
 function describe(run, category) {
   const link = run.resultsUrl ? ` - ${run.resultsUrl}` : '';
-  if (category === 'error' || category === 'timed-out') return `${run.label}: ${run.error ?? category}${link}`;
+  if (category === 'error' || category === 'timed-out') return `${displayName(run)}: ${run.error ?? category}${link}`;
   const count = run.result?.results?.[category];
-  return `${run.label}: ${count ? `${count} ${category}` : category}${link}`;
+  return `${displayName(run)}: ${count ? `${count} ${category}` : category}${link}`;
 }

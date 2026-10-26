@@ -1,0 +1,152 @@
+{
+  "result": {
+    "id": "00000000-0000-0000-0000-000000000001",
+    "name": "Google Tester",
+    "application": "Testing",
+    "status": "unresolved",
+    "environments": [
+      {
+        "name": "Safari",
+        "os": "Mac",
+        "viewport": "1200x857",
+        "device": "Desktop",
+        "browser": "Safari"
+      },
+      {
+        "name": "Android Emulation",
+        "orientation": "portrait",
+        "os": "Linux",
+        "viewport": "360x780",
+        "device": "Galaxy S22",
+        "browser": "Chrome"
+      },
+      {
+        "name": "Chrome",
+        "os": "Linux",
+        "viewport": "1440x900",
+        "device": "Desktop",
+        "browser": "Chrome"
+      }
+    ],
+    "started_at": "2026-10-26T17:56:59.291Z",
+    "duration": 68227,
+    "results": {
+      "total": 3,
+      "failed": 0,
+      "passed": 1,
+      "aborted": 0,
+      "pending": 0,
+      "modified": 0,
+      "unresolved": 2,
+      "steps_added": 1,
+      "unvalidated": 0,
+      "steps_removed": 0,
+      "steps_existing": 2,
+      "required_attention": 0,
+      "accessibility_failed": 0,
+      "accessibility_passed": 0,
+      "accessibility_pending": 0,
+      "accessibility_reports": 0,
+      "validation_region_added": 0,
+      "accessibility_unresolved": 0
+    },
+    "totals": {
+      "nlp": {
+        "total": 5,
+        "passed": 5
+      },
+      "steps": 6,
+      "checkpoints": {
+        "total": 1,
+        "unresolved": 1
+      }
+    },
+    "issues": [
+      {
+        "code": "VISUAL_DIFFERENCE",
+        "message": "A visual difference was detected",
+        "params": {
+          "url": "https://google.com",
+          "session_execution_ids": [
+            "00000000-0000-0000-0000-000000000002",
+            "00000000-0000-0000-0000-000000000003"
+          ],
+          "environment_execution_ids": [
+            "00000000-0000-0000-0000-000000000004",
+            "00000000-0000-0000-0000-000000000005"
+          ]
+        }
+      }
+    ],
+    "tests": [
+      {
+        "id": "00000000-0000-0000-0000-000000000006",
+        "name": "testing",
+        "status": "unresolved",
+        "testResultsUrl": "https://autonomous.applitools.com/applications/00000000-0000-0000-0000-000000000007/results/00000000-0000-0000-0000-000000000001/00000000-0000-0000-0000-000000000006/flow?accountId=ACCOUNT&direction=asc&orderBy=started_at",
+        "type": "custom_flow_test",
+        "steps": [
+          {
+            "type": "openpage",
+            "page": "https://google.com",
+            "instruction": "navigate to \"https://google.com\""
+          },
+          {
+            "type": "user_action",
+            "instruction": "Type \"Apple Pie\" in the search text field"
+          },
+          {
+            "type": "user_action",
+            "instruction": "Press the enter key"
+          },
+          {
+            "type": "user_action",
+            "instruction": "click the Images link"
+          },
+          {
+            "type": "user_action",
+            "instruction": "Verify that  the Search dropdown   equals \"Apple Pie\""
+          },
+          {
+            "type": "checkpoint",
+            "name": "testing - Step 6",
+            "match_level": "Strict",
+            "capture_type": "FullPage"
+          }
+        ],
+        "totals": {
+          "nlp": {
+            "total": 5,
+            "passed": 5
+          },
+          "steps": 6,
+          "checkpoints": {
+            "total": 1,
+            "unresolved": 1
+          }
+        },
+        "results": {
+          "total": 3,
+          "failed": 0,
+          "passed": 1,
+          "aborted": 0,
+          "pending": 0,
+          "modified": 0,
+          "unresolved": 2,
+          "steps_added": 1,
+          "unvalidated": 0,
+          "steps_removed": 0,
+          "steps_existing": 2,
+          "required_attention": 0,
+          "accessibility_failed": 0,
+          "accessibility_passed": 0,
+          "accessibility_pending": 0,
+          "accessibility_reports": 0,
+          "validation_region_added": 0,
+          "accessibility_unresolved": 0
+        }
+      }
+    ],
+    "planResultsUrl": "https://autonomous.applitools.com/applications/00000000-0000-0000-0000-000000000007/results/00000000-0000-0000-0000-000000000001/tests?accountId=ACCOUNT&direction=asc&orderBy=started_at"
+  }
+}

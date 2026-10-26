@@ -9,15 +9,19 @@ import { getChangedFiles } from './changes.js';
 export const NO_MATCH_MODES = ['skip', 'all', 'fail'];
 
 /**
- * @returns {{ targets: {kind, id}[], skipped: boolean }}
+ * @returns {{ targets: {kind, id}[], skipped: boolean, notes: string[] }}
+ * notes explain the test-map decision, for the job summary.
  * Throws when the test map is invalid or on-no-match is "fail" and nothing matched.
  */
-export async function resolveTargets(config, env = process.env, { log = () => {}, warn = () => {}, changes = getChangedFiles } = {}) {
+export async function resolveTargets(config, env = process.env, { log: logLine = () => {}, warn: warnLine = () => {}, changes = getChangedFiles } = {}) {
+  const notes = [];
+  const log = (m) => { notes.push(m); logLine(m); };
+  const warn = (m) => { notes.push(m); warnLine(m); };
   const targets = [
     ...config.planIds.map((id) => ({ kind: 'plan', id })),
     ...config.testIds.map((id) => ({ kind: 'test', id })),
   ];
-  if (!config.testMap) return { targets: dedupe(targets), skipped: false };
+  if (!config.testMap) return { targets: dedupe(targets), skipped: false, notes };
 
   const mapPath = resolve(env.GITHUB_WORKSPACE || process.cwd(), config.testMap);
   let text;
@@ -31,11 +35,11 @@ export async function resolveTargets(config, env = process.env, { log = () => {}
 
   let files = config.changedFiles;
   if (!files) {
-    const result = await changes(env, { token: config.githubToken, log });
+    const result = await changes(env, { token: config.githubToken, log: logLine });
     files = result.files;
     if (!files) {
       warn(`Could not determine changed files (${result.reason}); running every test in ${config.testMap}`);
-      return { targets: dedupe([...targets, ...everything]), skipped: false };
+      return { targets: dedupe([...targets, ...everything]), skipped: false, notes };
     }
   }
 
@@ -51,13 +55,13 @@ export async function resolveTargets(config, env = process.env, { log = () => {}
     if (config.onNoMatch === 'fail') throw new Error(message);
     if (config.onNoMatch === 'all') {
       log(`${message}; running every test in the map (on-no-match: all)`);
-      return { targets: dedupe([...targets, ...everything]), skipped: false };
+      return { targets: dedupe([...targets, ...everything]), skipped: false, notes };
     }
     log(`${message}; nothing extra to run (on-no-match: skip)`);
   }
 
   const all = dedupe([...targets, ...matched.flatMap(({ entry }) => entryTargets(entry))]);
-  return { targets: all, skipped: all.length === 0 };
+  return { targets: all, skipped: all.length === 0, notes };
 }
 
 function entryTargets(entry) {

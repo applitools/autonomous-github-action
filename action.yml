@@ -24,8 +24,16 @@ inputs:
     description: What to do when test-map matches no changed files and nothing else is set to run. skip (pass without running), all (run every test in the map) or fail.
     default: skip
   github-token:
-    description: Token used to read changed files for test-map. Needs contents read (push) or pull-requests read (pull_request).
+    description: Token used to read changed files for test-map and to post the PR comment. Needs contents read (push) or pull-requests read (pull_request); pull-requests write for pr-comment.
     default: ${{ github.token }}
+  summary:
+    description: Write a results table to the job summary.
+    default: "true"
+  pr-comment:
+    description: On pull requests, post the results as a comment, updated in place on re-runs.
+    default: "false"
+  comment-key:
+    description: Keeps separate PR comments for jobs that run the action more than once (e.g. a matrix over environments). Defaults to the job ID.
   url:
     description: Target URL to test against. Shortcut for parameters {"url":"..."}.
   parameters:

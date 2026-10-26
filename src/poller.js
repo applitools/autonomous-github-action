@@ -34,7 +34,7 @@ export async function waitForRuns(client, runs, {
   log = () => {},
 }) {
   const deadline = now() + timeoutMs;
-  const state = runs.map((run) => ({ ...run, outcome: undefined, result: undefined, error: undefined, resultsUrl: undefined, errors: 0, lastStatus: undefined }));
+  const state = runs.map((run) => ({ ...run, outcome: undefined, result: undefined, error: undefined, resultsUrl: undefined, name: undefined, errors: 0, lastStatus: undefined }));
   const warnedStatuses = new Set();
 
   while (true) {
@@ -46,6 +46,7 @@ export async function waitForRuns(client, runs, {
         const result = await client.getResult(s.id, s.readToken);
         s.errors = 0;
         s.result = result;
+        s.name ??= result.name;
         if (result.planResultsUrl && !s.resultsUrl) {
           s.resultsUrl = result.planResultsUrl;
           log(`${s.label} (${s.id}): results at ${s.resultsUrl}`);
